@@ -1,37 +1,26 @@
 package main
 
 import (
-	"log"
-
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/config"
-	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/database"
-	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/models"
-	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/routes"
-	"github.com/gofiber/fiber/v2"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/injector"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	config.LoadConfig()
-	database.OpenConnetion()
-	database.OpenRedisConnection()
-	config.InitializeValidator()
-
-	errorMigrate := database.DB.AutoMigrate(&models.Mahasiswa{})
-
-	if errorMigrate != nil {
-		log.Printf(errorMigrate.Error())
+	app, err := injector.InitializeApp()
+	if err != nil {
+		logrus.Fatal("Gagal menginisialisasi aplikasi: %v", err)
 	}
-	app := fiber.New()
 
-	routes.SetupRoutes(app)
+	logger := app.Logger
 
 	port := config.GetEnv("APP_PORT", "8080")
 
-	log.Printf("🚀 Server berjalan di port %s", port)
+	logger.Info("🚀 Server siap dan berjalan injector port ", port)
 
-	err := app.Listen("127.0.0.1:" + port)
-
+	err = app.App.Listen("127.0.0.1:" + port)
 	if err != nil {
-		log.Fatalf("Gagal menjalankan server: %v", err)
+		logger.Fatal("Gagal menjalankan server: ", err)
 	}
 }

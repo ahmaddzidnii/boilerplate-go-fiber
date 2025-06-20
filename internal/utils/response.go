@@ -45,13 +45,13 @@ func GetLocals[T any](c *fiber.Ctx, key string) (T, error) {
 
 	data := c.Locals(key)
 	if data == nil {
-		return result, fmt.Errorf("data dengan key '%s' tidak ditemukan di context", key)
+		return result, fmt.Errorf("data dengan key '%s' tidak ditemukan injector context", key)
 	}
 
 	result, ok := data.(T)
 	if !ok {
 		// %T akan mencetak tipe data, berguna untuk debugging
-		return result, fmt.Errorf("gagal konversi data: tipe data di context (%T) tidak cocok dengan tipe yang diminta (%T)", data, result)
+		return result, fmt.Errorf("gagal konversi data: tipe data injector context (%T) tidak cocok dengan tipe yang diminta (%T)", data, result)
 	}
 
 	return result, nil

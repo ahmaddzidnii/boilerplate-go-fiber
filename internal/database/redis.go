@@ -4,17 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
-
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
-var RedisClient *redis.Client
 var RedisCtx = context.Background()
 
-// OpenRedisConnection diubah untuk mengembalikan error jika koneksi gagal.
-func OpenRedisConnection() {
+func InitRedis() (*redis.Client, error) {
 	addr := fmt.Sprintf("%s:%s", config.GetEnv("REDIS_URL", "localhost"), config.GetEnv("REDIS_PORT", "6379"))
 
 	rdb := redis.NewClient(&redis.Options{
@@ -25,9 +21,9 @@ func OpenRedisConnection() {
 	})
 
 	if err := rdb.Ping(RedisCtx).Err(); err != nil {
-		panic(err)
+		return nil, err
 
 	}
-	log.Println("Berhasil terhubung ke Redis.")
-	RedisClient = rdb
+
+	return rdb, nil
 }

@@ -8,13 +8,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-func SetupRoutes(app *fiber.App) {
-	// Middleware untuk logging setiap request
+// Ganti nama fungsi ini agar perannya lebih jelas (opsional tapi disarankan)
+// Fungsi ini sekarang hanya bertugas mendaftarkan rute, bukan sebagai provider Wire.
+func RegisterRoutes(app *fiber.App, authHandler *handlers.AuthHandler, mid *middlewares.Middleware) {
 	app.Use(logger.New())
 
-	// ========================================================================
-	// KONFIGURASI CORS
-	// ========================================================================
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000,http://localhost:4173,https://situs-frontend-anda.com",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
@@ -25,9 +23,7 @@ func SetupRoutes(app *fiber.App) {
 	api := app.Group("/api/v1")
 
 	authRoute := api.Group("/auth")
-
-	authRoute.Post("/login", handlers.Login)
-	authRoute.Post("/logout", handlers.Logout)
-	authRoute.Get("/session", middlewares.AuthMiddleware(), handlers.GetSession)
-
+	authRoute.Post("/login", authHandler.Login)
+	authRoute.Post("/logout", authHandler.Logout)
+	authRoute.Get("/session", mid.AuthMiddleware(), authHandler.GetSession)
 }
