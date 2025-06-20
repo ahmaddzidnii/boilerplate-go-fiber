@@ -17,10 +17,10 @@ func main() {
 
 	port := config.GetEnv("APP_PORT", "8080")
 
-	logger.Info("🚀 Server siap dan berjalan injector port ", port)
-
 	err = app.App.Listen("127.0.0.1:" + port)
 	if err != nil {
-		logger.Fatal("Gagal menjalankan server: ", err)
+		logger.Error("Gagal menjalankan server: ", err)
 	}
+
+	logger.Info("🚀 Server  berjalan pada port ", port)
 }
