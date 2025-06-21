@@ -1,0 +1,12 @@
+#TEST GET SESSION
+GET http://localhost:1001/api/v1/auth/session
+
+#TEST POST LOGIN
+###
+POST http://localhost:1001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "23106050077",
+  "password": "12345678"
+}

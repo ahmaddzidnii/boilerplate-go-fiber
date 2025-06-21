@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend1:
+    image: backend
+    container_name: service-backend1
+    restart: always
+    ports:
+      - "1001:1001"
+    mem_limit: 768m
+    cpus: 0.9
+    networks:
+      - app-net
+
+  backend2:
+    image: backend
+    container_name: service-backend2
+    restart: always
+    ports:
+      - "1002:1001"
+    mem_limit: 768m
+    cpus: 0.9
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
