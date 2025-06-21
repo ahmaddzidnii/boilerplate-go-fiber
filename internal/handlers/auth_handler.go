@@ -83,8 +83,6 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	cookie.Expires = time.Now().Add(ttl)
 	cookie.HTTPOnly = true
 	cookie.Path = "/"
-	cookie.SameSite = "none"
-	cookie.Secure = false
 
 	c.Cookie(cookie)
 
