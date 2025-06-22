@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9" // <-- Import redis client
 	"log"
+	"strings"
 )
 
 // Struct Middleware akan menyimpan dependensi yang diperlukan
@@ -22,29 +23,50 @@ func NewMiddleware(redis *redis.Client) *Middleware {
 
 func (m *Middleware) AuthMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		sessionId := c.Cookies("session_id")
-		if sessionId == "" {
-			return utils.Error(c, fiber.StatusUnauthorized, "Token tidak diberikan")
+		var token string
+
+		// 1. Prioritaskan untuk memeriksa 'Authorization: Bearer <token>' header
+		authHeader := c.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
 		}
 
-		sessionKey := "session:" + sessionId
+		// 2. Jika tidak ada di header, fallback ke cookie
+		if token == "" {
+			token = c.Cookies("session_id")
+		}
 
+		// 3. Jika token tetap kosong setelah dicek di kedua tempat, tolak akses
+		if token == "" {
+			return utils.Error(c, fiber.StatusUnauthorized, "Header otentikasi atau cookie sesi tidak ditemukan")
+		}
+
+		// --- Mulai dari sini, logikanya sama persis, hanya menggunakan variabel 'token' ---
+
+		// 4. Verifikasi token/session ID dengan Redis
+		sessionKey := "session:" + token
 		dataFromRedis, err := m.Redis.Get(c.Context(), sessionKey).Result()
 		if err != nil {
+			// Jika session tidak ditemukan di Redis
 			if errors.Is(err, redis.Nil) {
-				return utils.Error(c, fiber.StatusUnauthorized, "Session tidak ditemukan atau sudah berakhir")
+				utils.ClearCookies(c, "session_id")
+				return utils.Error(c, fiber.StatusUnauthorized, "Sesi tidak ditemukan atau sudah berakhir")
 			}
-			log.Printf("Gagal mengambil session dari Redis: %v", err)
-			return utils.Error(c, fiber.StatusUnauthorized, "Session tidak valid")
+			// Jika ada error lain saat mengakses Redis
+			log.Printf("Gagal mengambil sesi dari Redis: %v", err)
+			return utils.Error(c, fiber.StatusUnauthorized, "Sesi tidak valid")
 		}
 
+		// 5. Unmarshal data sesi dan simpan ke c.Locals
 		var sessionData models.Session
 		if err := json.Unmarshal([]byte(dataFromRedis), &sessionData); err != nil {
-			log.Printf("Data session corrupt injector Redis: %v", err)
+			log.Printf("Data sesi corrupt di Redis: %v", err)
 			return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
 		}
 
 		c.Locals("session_data", sessionData)
+
+		// 6. Lanjutkan ke handler/route selanjutnya
 		return c.Next()
 	}
 }

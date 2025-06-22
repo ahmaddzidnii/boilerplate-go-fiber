@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -92,19 +93,39 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
-	sessionId := c.Cookies("session_id")
-	if sessionId == "" {
-		return utils.Error(c, fiber.StatusUnauthorized, "Tidak ada session yang ditemukan")
+	var sessionId string
+
+	// 1. Prioritaskan untuk memeriksa 'Authorization: Bearer <token>' header
+	authHeader := c.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		// Ambil token dari header
+		sessionId = strings.TrimPrefix(authHeader, "Bearer ")
+
+	} else {
+		// 2. Jika tidak ada header, fallback ke cookie
+		sessionId = c.Cookies("session_id")
+
 	}
 
-	sessionKey := "session:" + sessionId
+	// 3. Jika tidak ada token di header maupun cookie, kembalikan error
+	if sessionId == "" {
+		return utils.Error(c, fiber.StatusUnauthorized, "Tidak ada sesi atau token yang ditemukan")
+	}
 
+	// 4. Hapus sesi dari Redis menggunakan sessionId yang ditemukan
+	sessionKey := "session:" + sessionId
 	err := h.Redis.Del(c.Context(), sessionKey).Err()
-	if err != nil {
+
+	// Meskipun key tidak ada di Redis (misalnya sudah expired),
+	// kita tetap lanjutkan proses logout di sisi klien.
+	// Kita hanya melempar error jika ada masalah koneksi dengan Redis.
+	if err != nil && err != redis.Nil {
 		return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
 	utils.ClearCookies(c, "session_id")
+
+	// 6. Kembalikan respons sukses
 	return utils.Success(c, fiber.StatusOK, fiber.Map{
 		"message": "Logout successful",
 	})

@@ -24,6 +24,6 @@ func RegisterRoutes(app *fiber.App, authHandler *handlers.AuthHandler, mid *midd
 
 	authRoute := api.Group("/auth")
 	authRoute.Post("/login", authHandler.Login)
-	authRoute.Post("/logout", authHandler.Logout)
+	authRoute.Post("/logout", mid.AuthMiddleware(), authHandler.Logout)
 	authRoute.Get("/session", mid.AuthMiddleware(), authHandler.GetSession)
 }
