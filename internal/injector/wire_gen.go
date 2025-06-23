@@ -11,7 +11,6 @@ import (
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/database"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/handlers"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/middlewares"
-	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/models"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/routes"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -30,7 +29,7 @@ func InitializeApp() (Application, error) {
 	validate := ProvideValidator()
 	authHandler := handlers.NewAuthHandler(db, client, validate)
 	middleware := middlewares.NewMiddleware(client)
-	app := ProvideRouter(authHandler, middleware)
+	app := ProvideRouter(authHandler, middleware, db)
 	application := NewApplication(app, logger)
 	return application, nil
 }
@@ -44,10 +43,7 @@ type Application struct {
 
 func ProvideDatabase(logger *logrus.Logger) *gorm.DB {
 	db := database.InitDatabase()
-	err := db.AutoMigrate(&models.Mahasiswa{})
-	if err != nil {
-		logger.Fatalf("Gagal melakukan migrasi database: %v", err)
-	}
+
 	logger.Info("Koneksi database dan migrasi berhasil.")
 	return db
 }
@@ -69,9 +65,9 @@ func ProvideLogger() *logrus.Logger {
 	return config.InitLogger()
 }
 
-func ProvideRouter(authHandler *handlers.AuthHandler, middleware *middlewares.Middleware) *fiber.App {
+func ProvideRouter(authHandler *handlers.AuthHandler, middleware *middlewares.Middleware, DB *gorm.DB) *fiber.App {
 	app := fiber.New()
-	routes.RegisterRoutes(app, authHandler, middleware)
+	routes.RegisterRoutes(app, authHandler, middleware, DB)
 	return app
 }
 

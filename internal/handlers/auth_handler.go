@@ -57,8 +57,8 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	sessionPayload := models.Session{
-		UserId: mhs.IdMahasiswa,
-		Nim:    mhs.Nim,
+		UserId: mhs.IdMahasiswa.String(),
+		Nim:    mhs.NIM,
 		Nama:   mhs.Nama,
 	}
 	sessionId := uuid.NewString()

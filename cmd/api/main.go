@@ -17,7 +17,7 @@ func main() {
 
 	port := config.GetEnv("APP_PORT", "8080")
 
-	err = app.App.Listen("127.0.0.1:" + port)
+	err = app.App.Listen("0.0.0.0:" + port)
 	if err != nil {
 		logger.Error("Gagal menjalankan server: ", err)
 	}
