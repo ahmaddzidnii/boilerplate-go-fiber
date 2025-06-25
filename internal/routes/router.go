@@ -18,7 +18,7 @@ func RegisterRoutes(app *fiber.App, authHandler *handlers.AuthHandler, mid *midd
 	app.Use(logger.New())
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000,http://localhost:4173,https://situs-frontend-anda.com",
+		AllowOrigins:     "http://localhost:3000,http://localhost:4173,https://krs-dev.masako.my.id",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET, POST, HEAD, PUT, DELETE, PATCH",
 		AllowCredentials: true,

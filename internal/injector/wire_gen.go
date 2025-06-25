@@ -43,7 +43,6 @@ type Application struct {
 
 func ProvideDatabase(logger *logrus.Logger) *gorm.DB {
 	db := database.InitDatabase()
-
 	logger.Info("Koneksi database dan migrasi berhasil.")
 	return db
 }
@@ -51,7 +50,8 @@ func ProvideDatabase(logger *logrus.Logger) *gorm.DB {
 func ProvideRedis(logger *logrus.Logger) *redis.Client {
 	client, err := database.InitRedis()
 	if err != nil {
-		logger.Fatal("Gagal menginisialisasi Redis client")
+		logger.Error(err)
+		logger.Panic("Gagal menginisialisasi Redis client")
 	}
 	logger.Info("Koneksi Redis berhasil.")
 	return client
