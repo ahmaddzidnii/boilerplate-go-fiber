@@ -1,43 +1,37 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/models"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/service"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
+	"github.com/sirupsen/logrus"
 	"log"
 	"strings"
 	"time"
 )
 
 type AuthHandler struct {
-	DB        *gorm.DB
-	Redis     *redis.Client
-	Validator *validator.Validate
+	AuthService service.AuthService
+	Logger      *logrus.Logger
+	Validator   *validator.Validate
 }
 
-func NewAuthHandler(db *gorm.DB, redis *redis.Client, validator *validator.Validate) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, logger *logrus.Logger, validator *validator.Validate) *AuthHandler {
 	return &AuthHandler{
-		DB:        db,
-		Redis:     redis,
-		Validator: validator,
+		AuthService: authService,
+		Logger:      logger,
+		Validator:   validator,
 	}
 }
 
-type LoginRequest struct {
-	Username string `validate:"required" json:"username"`
-	Password string `validate:"required" json:"password"`
-}
-
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
-	var req LoginRequest
+	var req service.LoginRequest
 
 	if err := c.BodyParser(&req); err != nil {
+		h.Logger.WithError(err).Error("Gagal mem-parsing body request login")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
 	}
 
@@ -49,39 +43,21 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		}
 	}
 
-	mhs := models.Mahasiswa{}
-	data := h.DB.First(&mhs, "nim = ? AND password = ?", req.Username, req.Password)
+	sessionId, err := h.AuthService.Login(c.Context(), req)
 
-	if data.Error != nil {
-		return utils.Error(c, fiber.StatusUnauthorized, "Username atau password salah")
-	}
-
-	sessionPayload := models.Session{
-		UserId: mhs.IdMahasiswa.String(),
-		Nim:    mhs.NIM,
-		Nama:   mhs.Nama,
-	}
-	sessionId := uuid.NewString()
-
-	payload, errMarshal := json.Marshal(sessionPayload)
-	if errMarshal != nil {
-		log.Print(errMarshal)
-		return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
-	}
-
-	sessionKey := "session:" + sessionId
-	ttl := 2 * time.Hour
-
-	errRedis := h.Redis.Set(c.Context(), sessionKey, payload, ttl).Err()
-	if errRedis != nil {
-		log.Printf("Gagal menyimpan session ke Redis: %v", errRedis)
-		return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
+	if err != nil {
+		h.Logger.WithError(err).Error("Gagal melakukan login")
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			return utils.Error(c, fiber.StatusUnauthorized, "NIM atau password salah")
+		} else if errors.Is(err, service.ErrInternalServer) {
+			return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
+		}
 	}
 
 	cookie := new(fiber.Cookie)
 	cookie.Name = "session_id"
 	cookie.Value = sessionId
-	cookie.Expires = time.Now().Add(ttl)
+	cookie.Expires = time.Now().Add(service.TTL)
 	cookie.HTTPOnly = true
 	cookie.Path = "/"
 
@@ -94,38 +70,28 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	var sessionId string
-
-	// 1. Prioritaskan untuk memeriksa 'Authorization: Bearer <token>' header
 	authHeader := c.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
-		// Ambil token dari header
 		sessionId = strings.TrimPrefix(authHeader, "Bearer ")
 
 	} else {
-		// 2. Jika tidak ada header, fallback ke cookie
 		sessionId = c.Cookies("session_id")
 
 	}
 
-	// 3. Jika tidak ada token di header maupun cookie, kembalikan error
 	if sessionId == "" {
 		return utils.Error(c, fiber.StatusUnauthorized, "Tidak ada sesi atau token yang ditemukan")
 	}
 
-	// 4. Hapus sesi dari Redis menggunakan sessionId yang ditemukan
-	sessionKey := "session:" + sessionId
-	err := h.Redis.Del(c.Context(), sessionKey).Err()
+	err := h.AuthService.Logout(c.Context(), sessionId)
 
-	// Meskipun key tidak ada di Redis (misalnya sudah expired),
-	// kita tetap lanjutkan proses logout di sisi klien.
-	// Kita hanya melempar error jika ada masalah koneksi dengan Redis.
-	if err != nil && err != redis.Nil {
+	if err != nil {
+		h.Logger.WithError(err).Error("Gagal menghapus sesi")
 		return utils.Error(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
 	utils.ClearCookies(c, "session_id")
 
-	// 6. Kembalikan respons sukses
 	return utils.Success(c, fiber.StatusOK, fiber.Map{
 		"message": "Logout successful",
 	})

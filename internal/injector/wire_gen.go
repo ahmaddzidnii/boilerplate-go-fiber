@@ -11,7 +11,9 @@ import (
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/database"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/handlers"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/middlewares"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/repository"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/routes"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/service"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/wire"
@@ -25,9 +27,12 @@ import (
 func InitializeApp() (Application, error) {
 	logger := ProvideLogger()
 	db := ProvideDatabase(logger)
+	authRepository := repository.NewAuthRepository(db, logger)
 	client := ProvideRedis(logger)
+	sessionRepository := repository.NewSessionRepository(client, logger)
+	authService := service.NewAuthService(authRepository, sessionRepository, logger)
 	validate := ProvideValidator()
-	authHandler := handlers.NewAuthHandler(db, client, validate)
+	authHandler := handlers.NewAuthHandler(authService, logger, validate)
 	middleware := middlewares.NewMiddleware(client)
 	app := ProvideRouter(authHandler, middleware, db)
 	application := NewApplication(app, logger)
@@ -65,6 +70,7 @@ func ProvideLogger() *logrus.Logger {
 	return config.InitLogger()
 }
 
+// ProvideRouter: Tambahkan kembali DB *gorm.DB sebagai parameter
 func ProvideRouter(authHandler *handlers.AuthHandler, middleware *middlewares.Middleware, DB *gorm.DB) *fiber.App {
 	app := fiber.New()
 	routes.RegisterRoutes(app, authHandler, middleware, DB)
@@ -78,15 +84,22 @@ func NewApplication(app *fiber.App, logger *logrus.Logger) Application {
 	}
 }
 
-var AuthSet = wire.NewSet(handlers.NewAuthHandler, middlewares.NewMiddleware)
+var RepositorySet = wire.NewSet(repository.NewAuthRepository, repository.NewSessionRepository)
+
+var ServiceSet = wire.NewSet(service.NewAuthService)
+
+var HandlerSet = wire.NewSet(handlers.NewAuthHandler, middlewares.NewMiddleware)
 
 var AppSet = wire.NewSet(
-	AuthSet,
+
 	ProvideDatabase,
 	ProvideRedis,
 	ProvideValidator,
 	ProvideLogger,
 	ProvideRouter,
-
 	NewApplication,
+
+	RepositorySet,
+	ServiceSet,
+	HandlerSet,
 )

@@ -8,7 +8,9 @@ import (
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/database"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/handlers"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/middlewares"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/repository"
 	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/routes"
+	"github.com/ahmaddzidnii/backend-krs-auth-service/internal/service"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/wire"
@@ -59,20 +61,34 @@ func NewApplication(app *fiber.App, logger *logrus.Logger) Application {
 	}
 }
 
-var AuthSet = wire.NewSet(
+var RepositorySet = wire.NewSet(
+	//Mengembaikan constructor untuk setiap repository.
+	repository.NewAuthRepository,
+	repository.NewSessionRepository,
+)
+
+var ServiceSet = wire.NewSet(
+	// Mengembalikan constructor untuk setiap service.
+	service.NewAuthService,
+)
+
+var HandlerSet = wire.NewSet(
 	handlers.NewAuthHandler,
 	middlewares.NewMiddleware,
 )
 
 var AppSet = wire.NewSet(
-	AuthSet,
 	ProvideDatabase,
 	ProvideRedis,
 	ProvideValidator,
 	ProvideLogger,
 	ProvideRouter,
-
 	NewApplication,
+
+	// Set untuk setiap layer
+	RepositorySet,
+	ServiceSet,
+	HandlerSet,
 )
 
 func InitializeApp() (Application, error) {
